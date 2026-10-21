@@ -199,9 +199,13 @@ export function hidden(name: string, value: string): string {
   return `<input type="hidden" name="${e(name)}" value="${e(value)}">`;
 }
 
-/** The Google button (design system §7.1): primary, with a leading "G" disc. */
+/**
+ * The Google button (design system §7.1), with a leading "G" disc. Secondary,
+ * not primary: it sits on the same card as "Sign in", and one card gets one
+ * primary action.
+ */
 export function googleButton(href: string, label = "Continue with Google", size: "lg" | "md" = "lg"): string {
-  return `<a class="btn btn--primary${size === "lg" ? " btn--lg btn--block" : ""}" href="${e(href)}"><span class="g" aria-hidden="true">G</span><span>${e(
+  return `<a class="btn btn--secondary${size === "lg" ? " btn--lg btn--block" : ""}" href="${e(href)}"><span class="g" aria-hidden="true">G</span><span>${e(
     label,
   )}</span></a>`;
 }

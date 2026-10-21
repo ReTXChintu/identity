@@ -274,7 +274,7 @@ svg{flex:none}
 .btn--danger{background:transparent;color:var(--crit);border-color:var(--crit-soft);padding:0 16px}
 .btn--danger:hover{background:var(--crit-soft);color:var(--crit)}
 .btn:disabled{background:var(--sunk);color:var(--tx3);border-color:transparent;cursor:not-allowed}
-.g{width:20px;height:20px;border-radius:50%;background:var(--ac-tx);color:var(--ac);display:inline-flex;align-items:center;justify-content:center;font-size:12px;line-height:1;font-weight:600;flex:none}
+.g{width:20px;height:20px;border-radius:50%;background:var(--ac);color:var(--ac-tx);display:inline-flex;align-items:center;justify-content:center;font-size:12px;line-height:1;font-weight:600;flex:none}
 .or{display:flex;align-items:center;gap:12px;color:var(--tx3);font-size:12px;line-height:16px}
 .or::before,.or::after{content:"";flex:1;height:1px;background:var(--ln)}
 .links{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 16px;font-size:14px;line-height:20px;font-weight:600}
