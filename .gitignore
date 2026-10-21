@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+*.log
+coverage/
+# TLS material never belongs in git
+*.pem
+*.key
+*.crt
