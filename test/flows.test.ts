@@ -92,7 +92,13 @@ describe("discovery", () => {
     assert.match(page.html, /aria-label="Show password"/);
     const csp = (await request(jar, page.url)).headers.get("content-security-policy") ?? "";
     assert.match(csp, /default-src 'none'/);
-    assert.match(csp, /script-src 'nonce-/);
+    assert.match(csp, /script-src 'nonce-[^';]+'(;|$)/, "scripts: this response's nonce only");
+    // Styles: the nonce plus Google Fonts' stylesheet; fonts: only its font files.
+    assert.match(csp, /style-src 'nonce-[^';]+' https:\/\/fonts\.googleapis\.com(;|$)/);
+    assert.match(csp, /font-src https:\/\/fonts\.gstatic\.com(;|$)/);
+    assert.doesNotMatch(csp, /unsafe-inline/);
+    // A sign-in started by SpendLog takes SpendLog's accent.
+    assert.match(page.html, /<html lang="en" class="app-spendlog">/);
   });
 });
 

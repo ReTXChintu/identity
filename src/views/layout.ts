@@ -1,11 +1,21 @@
-// The shared HTML shell: inline CSS (nonce'd for the strict CSP), light and
-// dark themes, full-width and mobile-first. These pages often open inside an
-// Android Chrome Custom Tab, so they carry no external assets at all.
+// The shared HTML shells, built on the suite design system (theme.ts).
+//
+// - authLayout: the sign-in layout (design system §6.2): a brand panel and the
+//   form panel side by side on desktop, stacked on phones, full width.
+// - pageLayout: the account page shell (§6.1): a header bar and a full-width
+//   main area.
+//
+// Styles and the script are inline with this request's CSP nonce. The only
+// external asset is the IBM Plex stylesheet from Google Fonts, which the CSP
+// allows by origin (security.ts). These pages often open inside an Android
+// Chrome Custom Tab, so there is nothing else to fetch.
 import { escapeHtml as e } from "../security.js";
 import type { Branding } from "../oidc/clients.js";
-import { STYLESHEET } from "./theme.js";
+import { icon, mark, markFor } from "./icons.js";
+import { accentClass, FONT_CSS_ORIGIN, FONT_FILE_ORIGIN, FONT_STYLESHEET_URL, STYLESHEET } from "./theme.js";
 
-
+// The password eye (design system §7.2): swaps the input type, the label and
+// the pressed state; a revealed value is set in Plex Mono.
 const SCRIPT = `
 document.querySelectorAll("[data-toggle]").forEach(function (button) {
   button.addEventListener("click", function () {
@@ -13,9 +23,9 @@ document.querySelectorAll("[data-toggle]").forEach(function (button) {
     if (!input) return;
     var show = input.type === "password";
     input.type = show ? "text" : "password";
+    input.classList.toggle("is-revealed", show);
     button.setAttribute("aria-label", show ? "Hide password" : "Show password");
     button.setAttribute("aria-pressed", show ? "true" : "false");
-    button.classList.toggle("on", show);
   });
 });
 document.querySelectorAll("form[data-once]").forEach(function (form) {
@@ -27,42 +37,119 @@ var auto = document.querySelector("form[data-autosubmit]");
 if (auto) auto.submit();
 `;
 
-export interface LayoutOptions {
-  title: string;
-  nonce: string;
-  body: string;
-  /** Show the account link in the top bar (off on sign-in pages). */
-  accountLink?: boolean;
-}
-
-export function layout({ title, nonce, body, accountLink }: LayoutOptions): string {
+function documentShell(o: { title: string; nonce: string; accent?: string; body: string }): string {
+  const cls = accentClass(o.accent);
   return `<!doctype html>
-<html lang="en">
+<html lang="en"${cls ? ` class="${cls}"` : ""}>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <meta name="robots" content="noindex">
-<title>${e(title)}</title>
-<style nonce="${e(nonce)}">${STYLESHEET}</style>
+<title>${e(o.title)}</title>
+<link rel="preconnect" href="${FONT_CSS_ORIGIN}">
+<link rel="preconnect" href="${FONT_FILE_ORIGIN}" crossorigin>
+<link rel="stylesheet" href="${FONT_STYLESHEET_URL}">
+<style nonce="${e(o.nonce)}">${STYLESHEET}</style>
 </head>
 <body>
-<header class="topbar">
-  <span class="dots" aria-hidden="true"><span class="dot spendlog"></span><span class="dot trippin"></span><span class="dot inframe"></span></span>
-  <span class="brand">Account</span>
-  <span class="spacer"></span>
-  ${accountLink ? '<a href="/account">Your account</a>' : ""}
-</header>
-<main>
-${body}
-</main>
-<footer>One account for SpendLog, Trippin and InFrame.</footer>
-<script nonce="${e(nonce)}">${SCRIPT}</script>
+${o.body}
+<script nonce="${e(o.nonce)}">${SCRIPT}</script>
 </body>
 </html>`;
 }
 
-const EYE = `<svg class="on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><svg class="off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
+const APPS: { className: string; name: string }[] = [
+  { className: "app-spendlog", name: "SpendLog" },
+  { className: "app-trippin", name: "Trippin" },
+  { className: "app-inframe", name: "InFrame" },
+];
+
+const BENEFITS: { icon: Parameters<typeof icon>[0]; text: string }[] = [
+  { icon: "lock", text: "Your password is kept only as a one-way hash" },
+  { icon: "refresh", text: "Change your password once and it changes in every app" },
+  { icon: "shield", text: "Sign out of every app on every device in one step" },
+];
+
+/** The brand panel's lower card: who is asking, and the apps this account opens. */
+function glimpse(branding: Branding | null): string {
+  const isAccount = branding?.className === "app-account";
+  const head = !branding
+    ? `<p class="t-title-card">Works in all three apps</p><p class="t-body-s tx3">Sign in to one and the others know it’s you.</p>`
+    : isAccount
+      ? `<p class="t-title-card">Signing in to your account</p><p class="t-body-s tx3">Manage your name, password and Google sign-in.</p>`
+      : `<p class="t-title-card">Continue to ${e(branding.name)}</p><p class="t-body-s tx3">${e(branding.name)} is asking you to sign in.</p>`;
+  const rows = APPS.map((app) => {
+    const asking = branding?.className === app.className;
+    return `<li class="app-row ${app.className}${asking ? " app-row--asking" : ""}">${mark(markFor(app.className))}<span class="app-row__name">${e(
+      app.name,
+    )}</span>${asking ? '<span class="badge badge--on">Asking you to sign in</span>' : ""}</li>`;
+  }).join("");
+  return `<div class="glimpse"><div class="glimpse__head">${head}</div><ul class="apps" aria-label="Apps that use this account">${rows}</ul></div>`;
+}
+
+/** The brand panel (design system §6.2): logo, headline, benefits, glimpse. */
+function brandPanel(branding: Branding | null, accountLink: boolean): string {
+  const app = accentClass(branding?.className) ? branding : null;
+  return `<section class="auth__brand" aria-label="About this account">
+  <div class="brand__top">
+    <span class="logo">${mark(markFor(app?.className))}<span>${app ? e(app.name) : "Account"}</span></span>
+    <span class="spacer"></span>
+    ${accountLink ? '<a class="brand__link" href="/account">Your account</a>' : ""}
+  </div>
+  <div class="brand__copy">
+    <p class="t-display">One account for SpendLog, Trippin and InFrame</p>
+    <p class="t-body-l brand__lede">Sign in once and every app knows it’s you, on the web and on Android.</p>
+  </div>
+  <ul class="benefits">${BENEFITS.map(
+    (b) => `<li class="benefit"><span class="icon-tile icon-tile--sm">${icon(b.icon)}</span><span>${e(b.text)}</span></li>`,
+  ).join("")}</ul>
+  ${glimpse(branding)}
+</section>`;
+}
+
+export interface AuthLayoutOptions {
+  title: string;
+  nonce: string;
+  /** Who is asking. An app's branding also gives the page that app's accent. */
+  branding: Branding | null;
+  /** The form column: one or more cards. */
+  content: string;
+  /** Show the "Your account" link in the brand panel. */
+  accountLink?: boolean;
+}
+
+export function authLayout(o: AuthLayoutOptions): string {
+  return documentShell({
+    title: o.title,
+    nonce: o.nonce,
+    accent: o.branding?.className,
+    body: `<div class="auth">
+${brandPanel(o.branding, Boolean(o.accountLink))}
+<main class="auth__form"><div class="auth__col">
+${o.content}
+</div></main>
+</div>`,
+  });
+}
+
+/** The account page shell: header bar plus a full-width main area. */
+export function pageLayout(o: { title: string; nonce: string; body: string }): string {
+  return documentShell({
+    title: o.title,
+    nonce: o.nonce,
+    body: `<div class="page">
+<header class="topbar">
+  <a class="logo" href="/account">${mark("identity")}<span>Account</span></a>
+  <span class="spacer"></span>
+  <a class="btn btn--ghost btn--sm" href="/account/signout">Sign out</a>
+</header>
+<main class="main">
+${o.body}
+</main>
+</div>`,
+  });
+}
 
 /** A password input with its show/hide eye button. Every password field uses this. */
 export function passwordField(opts: {
@@ -73,46 +160,48 @@ export function passwordField(opts: {
   hint?: string;
   minlength?: number;
 }): string {
-  return `<label for="${e(opts.id)}">${e(opts.label)}</label>
-<div class="pw">
-  <input class="input" type="password" id="${e(opts.id)}" name="${e(opts.name)}" autocomplete="${opts.autocomplete}" required${
-    opts.minlength ? ` minlength="${opts.minlength}"` : ""
-  } maxlength="200">
-  <button type="button" class="eye" data-toggle="${e(opts.id)}" aria-label="Show password" aria-pressed="false">${EYE}</button>
-</div>${opts.hint ? `<p class="hint">${e(opts.hint)}</p>` : ""}`;
+  const id = e(opts.id);
+  const hintId = opts.hint ? `${id}-help` : "";
+  return `<div class="field">
+  <label class="label" for="${id}">${e(opts.label)}</label>
+  <div class="pw">
+    <input class="input" type="password" id="${id}" name="${e(opts.name)}" autocomplete="${opts.autocomplete}" required${
+      opts.minlength ? ` minlength="${opts.minlength}"` : ""
+    } maxlength="200"${hintId ? ` aria-describedby="${hintId}"` : ""}>
+    <button type="button" class="eye" data-toggle="${id}" aria-controls="${id}" aria-label="Show password" aria-pressed="false">${icon(
+      "eye",
+      20,
+      "i-on",
+    )}${icon("eye-off", 20, "i-off")}</button>
+  </div>${opts.hint ? `\n  <p class="help" id="${hintId}">${e(opts.hint)}</p>` : ""}
+</div>`;
 }
 
+/** A labelled text-like input (design system §7.2). `attrs` is trusted markup. */
+export function textField(opts: { id: string; name: string; label: string; type: string; attrs: string; value?: string; inputClass?: string }): string {
+  const id = e(opts.id);
+  return `<div class="field">
+  <label class="label" for="${id}">${e(opts.label)}</label>
+  <input class="input${opts.inputClass ? ` ${opts.inputClass}` : ""}" type="${opts.type}" id="${id}" name="${e(opts.name)}" ${opts.attrs}${
+    opts.value !== undefined ? ` value="${e(opts.value)}"` : ""
+  }>
+</div>`;
+}
+
+/** Inline banners (design system §7.11): an error, or a confirmation. */
 export function alerts(opts: { error?: string; notice?: string }): string {
-  return `${opts.error ? `<div class="alert error" role="alert">${e(opts.error)}</div>` : ""}${
-    opts.notice ? `<div class="alert ok" role="status">${e(opts.notice)}</div>` : ""
-  }`;
+  return `${
+    opts.error ? `<div class="banner banner--crit" role="alert">${icon("alert-triangle")}<span>${e(opts.error)}</span></div>` : ""
+  }${opts.notice ? `<div class="banner banner--good" role="status">${icon("check")}<span>${e(opts.notice)}</span></div>` : ""}`;
 }
 
 export function hidden(name: string, value: string): string {
   return `<input type="hidden" name="${e(name)}" value="${e(value)}">`;
 }
 
-export const GOOGLE_ICON = `<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.6-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.6-.4-3.5z"/></svg>`;
-
-/** The left-hand panel on sign-in pages: what this is, and who is asking. */
-export function hero(branding: Branding | null): string {
-  const asking = branding
-    ? `<div class="asking ${branding.className}"><span class="mono">${e(branding.monogram)}</span><div><strong>${
-        branding.className === "app-account" ? "Signing in to your account" : `Continue to ${e(branding.name)}`
-      }</strong><span>${
-        branding.className === "app-account"
-          ? "Manage your name, password and Google sign-in."
-          : `${e(branding.name)} is asking you to sign in.`
-      }</span></div></div>`
-    : "";
-  return `<section class="hero">
-  <h1>One account for SpendLog, Trippin and InFrame</h1>
-  <p>Sign in once and every app knows it's you, on the web and on Android.</p>
-  <div class="apps">
-    <span class="chip app-spendlog"><span class="mono">S</span>SpendLog</span>
-    <span class="chip app-trippin"><span class="mono">T</span>Trippin</span>
-    <span class="chip app-inframe"><span class="mono">I</span>InFrame</span>
-  </div>
-  ${asking}
-</section>`;
+/** The Google button (design system §7.1): primary, with a leading "G" disc. */
+export function googleButton(href: string, label = "Continue with Google", size: "lg" | "md" = "lg"): string {
+  return `<a class="btn btn--primary${size === "lg" ? " btn--lg btn--block" : ""}" href="${e(href)}"><span class="g" aria-hidden="true">G</span><span>${e(
+    label,
+  )}</span></a>`;
 }

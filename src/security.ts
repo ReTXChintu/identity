@@ -1,10 +1,13 @@
 import crypto from "node:crypto";
 import type { NextFunction, Request, Response } from "express";
+import { FONT_CSS_ORIGIN, FONT_FILE_ORIGIN } from "./views/theme.js";
 
 /**
  * Per-request CSP nonce plus the usual hardening headers, applied to every
- * response, oidc-provider's own pages included. The policy is strict: no
- * external origins, inline <style>/<script> only with this request's nonce.
+ * response, oidc-provider's own pages included. The policy is strict:
+ * inline <style>/<script> only with this request's nonce, and the only
+ * external origins are Google Fonts' stylesheet and font files (the IBM Plex
+ * faces of the design system, views/theme.ts).
  *
  * Deliberately absent: form-action. Chrome applies it to the whole redirect
  * chain after a form POST, and a sign-in POST ends in a redirect to the
@@ -23,7 +26,8 @@ export function securityHeaders(options: { https: boolean }) {
       [
         "default-src 'none'",
         `script-src 'nonce-${nonce}'`,
-        `style-src 'nonce-${nonce}'`,
+        `style-src 'nonce-${nonce}' ${FONT_CSS_ORIGIN}`,
+        `font-src ${FONT_FILE_ORIGIN}`,
         "img-src 'self' data: https:",
         "base-uri 'none'",
         "frame-ancestors 'none'",

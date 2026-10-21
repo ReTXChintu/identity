@@ -1,6 +1,6 @@
 import nodemailer from "nodemailer";
 import type { AppConfig } from "../config.js";
-import { TOKENS as T } from "../views/theme.js";
+import { FONT_MONO, FONT_SANS, FONT_STYLESHEET_URL, LIGHT as C } from "../views/theme.js";
 
 export interface Mail {
   to: string;
@@ -44,11 +44,24 @@ const escape = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
 // Email clients ignore <style> blocks, so emails use inline styles, built
-// from the same design tokens as the web pages (views/theme.ts).
-function wrap(inner: string): string {
-  return `<!doctype html><html><body style="margin:0;padding:${T["space-6"]};font-family:${escape(T["font-sans"])};color:${T["color-text"]};background:${T["color-bg"]}">
-<div style="background:${T["color-surface"]};border-radius:${T["radius-lg"]};padding:${T["space-6"]}">${inner}
-<p style="color:${T["color-text-muted"]};font-size:${T["font-size-sm"]};margin-top:${T["space-6"]}">One account for SpendLog, Trippin and InFrame.</p></div></body></html>`;
+// from the same design tokens as the web pages (views/theme.ts): the light
+// theme and Identity's neutral ink accent. Full width, like the pages: no
+// centred column, just side padding.
+const font = escape(FONT_SANS);
+const mono = escape(FONT_MONO);
+const text = `font-family:${font};font-size:15px;line-height:22px;color:${C.tx2};margin:0 0 16px`;
+
+function wrap(title: string, inner: string): string {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light"><link rel="stylesheet" href="${FONT_STYLESHEET_URL}"><title>${escape(title)}</title></head>
+<body style="margin:0;padding:0;background:${C.bg}">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${C.bg}"><tr><td style="padding:24px 16px">
+<p style="font-family:${font};font-size:18px;line-height:24px;font-weight:700;letter-spacing:-.01em;color:${C.tx};margin:0 0 16px">Account</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${C.sf};border:1px solid ${C.ln};border-radius:14px"><tr><td style="padding:24px">
+<h1 style="font-family:${font};font-size:22px;line-height:28px;font-weight:600;color:${C.tx};margin:0 0 16px">${escape(title)}</h1>
+${inner}
+</td></tr></table>
+<p style="font-family:${font};font-size:12px;line-height:17px;color:${C.tx3};margin:16px 0 0">One account for SpendLog, Trippin and InFrame.</p>
+</td></tr></table></body></html>`;
 }
 
 export function verificationEmail(to: string, name: string, code: string): Mail {
@@ -56,9 +69,12 @@ export function verificationEmail(to: string, name: string, code: string): Mail 
     to,
     subject: `${code} is your verification code`,
     text: `Hi ${name},\n\nYour verification code is ${code}\n\nIt works for 15 minutes. If you didn't create an account, ignore this email.\n`,
-    html: wrap(`<p>Hi ${escape(name)},</p><p>Your verification code is</p>
-<p style="font-size:${T["font-size-3xl"]};font-weight:${T["font-weight-bold"]};letter-spacing:${T["space-2"]};margin:${T["space-2"]} 0">${code}</p>
-<p>It works for 15 minutes. If you didn't create an account, ignore this email.</p>`),
+    html: wrap(
+      "Your verification code",
+      `<p style="${text}">Hi ${escape(name)}, your verification code is</p>
+<p style="font-family:${mono};font-size:34px;line-height:40px;font-weight:500;letter-spacing:.12em;color:${C.tx};background:${C.sf2};border:1px solid ${C.ln};border-radius:12px;padding:16px 20px;margin:0 0 16px;display:inline-block">${escape(code)}</p>
+<p style="${text};margin:0">It works for 15 minutes. If you didn’t create an account, ignore this email.</p>`,
+    ),
   };
 }
 
@@ -67,9 +83,12 @@ export function resetEmail(to: string, name: string, link: string): Mail {
     to,
     subject: "Reset your password",
     text: `Hi ${name},\n\nSet a new password here (the link works for one hour):\n${link}\n\nIf you didn't ask for this, ignore this email; your password stays the same.\n`,
-    html: wrap(`<p>Hi ${escape(name)},</p><p>Set a new password using the button below. The link works for one hour.</p>
-<p><a href="${escape(link)}" style="display:inline-block;background:${T["color-accent"]};color:${T["color-on-accent"]};text-decoration:none;padding:${T["space-3"]} ${T["space-5"]};border-radius:${T["radius-sm"]};font-weight:${T["font-weight-semibold"]}">Set a new password</a></p>
-<p style="font-size:${T["font-size-sm"]};color:${T["color-text-muted"]};word-break:break-all">${escape(link)}</p>
-<p>If you didn't ask for this, ignore this email; your password stays the same.</p>`),
+    html: wrap(
+      "Reset your password",
+      `<p style="${text}">Hi ${escape(name)}, set a new password using the button below. The link works for one hour.</p>
+<p style="margin:0 0 16px"><a href="${escape(link)}" style="display:inline-block;font-family:${font};font-size:15px;line-height:20px;font-weight:600;background:${C.ac};color:${C["ac-tx"]};text-decoration:none;padding:14px 24px;border-radius:12px">Set a new password</a></p>
+<p style="font-family:${font};font-size:12px;line-height:17px;color:${C.tx3};word-break:break-all;margin:0 0 16px">Or open this link: <a href="${escape(link)}" style="color:${C.ac}">${escape(link)}</a></p>
+<p style="${text};margin:0">If you didn’t ask for this, ignore this email; your password stays the same.</p>`,
+    ),
   };
 }

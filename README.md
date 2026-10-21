@@ -263,15 +263,17 @@ NEW_PASSWORD='…' npm run user -- set-password alice@example.com
   - Its CSRF tokens are an HMAC of the session's uid.
 - **Cookies are named `idp_session`, `idp_interaction` and `idp_resume`.** Cookies are scoped by host, not by port, so a bare `_session` could collide with another service on the same duckdns host.
 - **Strict CSP.**
-  - `default-src 'none'`, plus per-request nonces for the inline `<style>` and `<script>`. No external assets, so the pages are fast in a Custom Tab.
+  - `default-src 'none'`, plus per-request nonces for the inline `<style>` and `<script>`.
+  - The only external origins are Google Fonts, for the design system's IBM Plex faces: `style-src` adds `https://fonts.googleapis.com` and `font-src` is `https://fonts.gstatic.com`. Nothing else is fetched, so the pages stay fast in a Custom Tab. Icons and logo marks are inline SVG.
   - `form-action` is deliberately not set: Chrome applies it to the redirect chain after a form POST, which ends at the app's redirect URI.
   - oidc-provider appends hashes for its own inline scripts.
 - **Rate limits are in memory.** One PM2 process (`instances: 1`), so no Redis is needed. A restart forgets the counters.
 - **Unverified and deleted users have no account as far as oidc-provider is concerned.** `findAccount` returns nothing for them, so a stale session or refresh token for one simply fails.
-- **All visual values live in one file, `src/views/theme.ts`.**
-  - It holds colours, fonts, sizes, radii and spacing as CSS custom properties: light in `:root`, dark under `prefers-color-scheme` or `[data-theme=dark]`.
-  - The page templates use only those variables and a small set of shared classes. The emails use the same tokens inline.
-  - When the shared design system (`docs/design-system.md` in the SpendLog repo) is final, swap the values in that file.
+- **All visual values live in one file, `src/views/theme.ts`, taken from the suite design system** (`docs/design-system.md` in the SpendLog repo).
+  - It holds the design system's colour tokens under their own short names (`--bg`, `--sf`, `--tx`, `--ac` ...): light in `:root`, dark under `prefers-color-scheme` or `[data-theme=dark]`. Fonts, radii and motion sit alongside.
+  - The accent is neutral ink, because this site belongs to every app. A sign-in started by SpendLog, Trippin or InFrame takes that app's accent and logo mark (an `app-<name>` class on `<html>`), so the hand-off feels continuous.
+  - The page templates use only those variables and a small set of shared classes. Icons are the design system's set, inlined from `src/views/icons.ts`. The emails use the same light tokens inline.
+  - Layout is full width: on sign-in pages a brand panel and the form panel sit side by side on desktop and stack on phones; the account page is a header plus two columns that wrap. Only the form card is width-capped (440 px).
 
 ## Tests
 
