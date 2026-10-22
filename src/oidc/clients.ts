@@ -108,8 +108,9 @@ export function buildClients(config: AppConfig): ClientMetadata[] {
     token_endpoint_auth_method: "none",
     grant_types: ["authorization_code"],
     response_types: ["code"],
-    redirect_uris: [`${config.issuer}/account/callback`],
-    post_logout_redirect_uris: [`${config.issuer}/account`],
+    // /admin signs in through the same client; it only needs the session too.
+    redirect_uris: [`${config.issuer}/account/callback`, `${config.issuer}/admin/callback`],
+    post_logout_redirect_uris: [`${config.issuer}/account`, `${config.issuer}/admin`],
   });
 
   return clients;

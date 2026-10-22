@@ -11,6 +11,7 @@ import https from "node:https";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createApp } from "./app.js";
+import { type Scheduler, startBackupScheduler } from "./backups/scheduler.js";
 import { ConfigError, environment, loadConfig } from "./config.js";
 import { connectDatabase, disconnectDatabase } from "./db.js";
 import { sweepLimits } from "./services/rateLimit.js";
@@ -70,6 +71,15 @@ async function main() {
 
   setInterval(() => sweepLimits(ctx.limits), 10 * 60_000).unref();
 
+  // Suite backups: every half hour and at midnight IST (backups/policy.ts).
+  let scheduler: Scheduler | null = null;
+  if (config.backups.enabled) {
+    scheduler = startBackupScheduler(ctx.backups);
+    console.log(`Backups on: ${config.backups.sources.map((s) => s.app).join(", ")} -> ${config.backups.dir}`);
+  } else {
+    console.log("Backups are off (BACKUP_ENABLED=false).");
+  }
+
   server.listen(config.port, config.host, () => {
     console.log(`Identity server listening on ${tls ? "https" : "http"}://${config.host}:${config.port}`);
     console.log(`  issuer: ${config.issuer}`);
@@ -89,6 +99,7 @@ async function main() {
 
   const shutdown = (signal: string) => {
     console.log(`${signal} received, shutting down.`);
+    scheduler?.stop();
     server.close(() => {
       void disconnectDatabase().finally(() => process.exit(0));
     });

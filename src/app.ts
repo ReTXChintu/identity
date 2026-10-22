@@ -1,10 +1,15 @@
 import crypto from "node:crypto";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import express, { type NextFunction, type Request, type Response } from "express";
 import mongoose from "mongoose";
+import { recordSignIns } from "./admin/signins.js";
+import type { RunnerDeps } from "./backups/runner.js";
 import type { AppConfig } from "./config.js";
 import type { AppContext } from "./context.js";
 import { createProvider } from "./oidc/provider.js";
 import { accountRoutes } from "./routes/account.js";
+import { adminRoutes } from "./routes/admin.js";
 import { googleRoutes } from "./routes/google.js";
 import { interactionRoutes } from "./routes/interaction.js";
 import { resetRoutes } from "./routes/reset.js";
@@ -14,16 +19,23 @@ import { createMailer, type Mailer } from "./services/mailer.js";
 import { createLimits, type Limits } from "./services/rateLimit.js";
 import { errorPage } from "./views/pages.js";
 
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
 export interface AppDeps {
   /** Defaults to SMTP (or the console) from config. */
   mailer?: Mailer;
   /** Defaults to real Google when configured; tests pass a fake. */
   google?: GoogleSignIn | null;
   limits?: Limits;
+  /** Backup plumbing overrides: a fake Drive, a fake dumper, a fake clock (tests). */
+  backups?: Partial<Pick<RunnerDeps, "makeDrive" | "dump" | "now" | "log">>;
+  /** Where the built admin SPA lives (default admin/dist). */
+  adminDist?: string;
 }
 
 export function createApp(config: AppConfig, deps: AppDeps = {}) {
   const provider = createProvider(config);
+  recordSignIns(provider);
   const ctx: AppContext = {
     config,
     provider,
@@ -32,6 +44,7 @@ export function createApp(config: AppConfig, deps: AppDeps = {}) {
     limits: deps.limits ?? createLimits(),
     // Derived, so rotating COOKIE_KEYS also rotates CSRF and code hashing.
     secret: crypto.createHash("sha256").update(`identity:${config.cookieKeys[0]}`).digest("base64url"),
+    backups: { backups: config.backups, google: config.google, ...deps.backups },
   };
 
   const app = express();
@@ -49,6 +62,7 @@ export function createApp(config: AppConfig, deps: AppDeps = {}) {
   app.use(googleRoutes(ctx));
   app.use(accountRoutes(ctx));
   app.use(resetRoutes(ctx));
+  app.use(adminRoutes(ctx, { backups: ctx.backups, adminDist: deps.adminDist ?? path.join(projectRoot, "admin", "dist") }));
 
   // Everything else (discovery, /auth, /token, /jwks, /me, /session/end,
   // revocation, introspection) is oidc-provider's.

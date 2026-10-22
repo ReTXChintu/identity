@@ -1,0 +1,123 @@
+/* The admin page's own layout and components. Colours, type and radii come
+   only from the suite tokens in /admin/theme.css (the server's views/theme.ts),
+   so this page looks like /account and the sign-in pages. Shell per design
+   system §6.1: a 248 sidebar on desktop, a segmented nav on smaller screens,
+   full-width content everywhere. No inline styles: the CSP forbids them. */
+
+.ad-shell { min-height: 100vh; display: flex; background: var(--bg); }
+.ad-side { display: none; width: 248px; flex: none; background: var(--sf); border-right: 1px solid var(--ln); padding: 20px 12px; flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100vh; }
+.ad-side .logo { padding: 0 8px 12px; }
+.ad-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ad-head { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 16px var(--pad-phone); border-bottom: 1px solid var(--ln); background: var(--bg); }
+.ad-head .spacer { flex: 1; }
+.ad-head .logo { display: inline-flex; }
+.ad-content { flex: 1; padding: 20px var(--pad-phone) 48px; display: flex; flex-direction: column; gap: 20px; }
+.ad-meta { font-size: 13px; line-height: 18px; color: var(--tx3); }
+@media (min-width: 600px) {
+  .ad-head { padding: 16px var(--pad-tablet); }
+  .ad-content { padding: 24px var(--pad-tablet) 48px; }
+}
+@media (min-width: 1024px) {
+  .ad-side { display: flex; }
+  .ad-head { padding: 16px var(--pad-desktop); }
+  .ad-head .logo, .ad-head .seg { display: none; }
+  .ad-content { padding: 24px var(--pad-desktop) 48px; }
+}
+
+/* Sidebar nav (§6.1) */
+.nav { display: flex; flex-direction: column; gap: 4px; }
+.nav__item { display: flex; align-items: center; gap: 12px; height: 40px; padding: 0 12px; border-radius: var(--r-md); color: var(--tx2); text-decoration: none; font-size: 14px; line-height: 20px; font-weight: 500; }
+.nav__item:hover { background: var(--sf2); color: var(--tx); }
+.nav__item[aria-current="page"] { background: var(--ac-soft); color: var(--ac); font-weight: 600; }
+.nav__item svg { color: inherit; }
+.nav__group { font-size: 11px; line-height: 14px; font-weight: 600; color: var(--tx3); margin: 14px 12px 4px; }
+.ad-side .spacer { flex: 1; }
+.ad-side .who { display: flex; flex-direction: column; gap: 2px; padding: 12px 12px 0; border-top: 1px solid var(--ln); font-size: 12px; line-height: 16px; color: var(--tx3); overflow-wrap: anywhere; }
+.ad-side .who a { font-size: 13px; font-weight: 600; }
+
+/* Segmented control (§7.3): the nav below desktop, and the destination picker */
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; padding: 4px; background: var(--sunk); border-radius: var(--r-lg); width: 100%; }
+.seg--fit { width: auto; min-width: 240px; }
+.seg__btn { height: 36px; border: 0; border-radius: 9px; background: transparent; color: var(--tx2); font: inherit; font-size: 14px; line-height: 20px; font-weight: 500; cursor: pointer; padding: 0 12px; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.seg__btn[aria-selected="true"], .seg__btn[aria-current="page"] { background: var(--sf); color: var(--tx); font-weight: 600; box-shadow: var(--shadow); }
+
+/* Tiles and stats (§7.5) */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 16px; }
+.tiles--wide { grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+.stat { background: var(--sf); border: 1px solid var(--ln); border-radius: var(--r-xl); padding: 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.stat__label { display: flex; align-items: center; gap: 8px; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: .02em; color: var(--tx2); }
+.stat__value { font-size: 22px; line-height: 28px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat__value--good { color: var(--good); }
+.stat__value--crit { color: var(--crit); }
+.stat__foot { font-size: 12px; line-height: 16px; color: var(--tx3); }
+.kpis { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+.kpi { display: flex; flex-direction: column; gap: 2px; }
+.kpi__label { font-size: 12px; line-height: 16px; font-weight: 600; color: var(--tx2); }
+.kpi__value { font-size: 17px; line-height: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* App card: an accent-tinted header strip with the app's mark */
+.app-card { padding: 0; overflow: hidden; }
+.app-card__head { display: flex; align-items: center; gap: 12px; padding: 14px 20px; background: var(--ac-soft); border-bottom: 1px solid var(--ac-line); color: var(--tx); }
+.app-card__head .t-title-card { flex: 1; }
+.app-card__body { padding: 16px 20px 20px; display: flex; flex-direction: column; gap: 12px; }
+.app-card .kpis { gap: 12px 28px; }
+
+/* Card header row (§7.5) */
+.card__row { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.card__row h2 { flex: 1; min-width: 0; }
+.card__row .meta { font-size: 12px; line-height: 16px; color: var(--tx3); }
+
+/* Tables (§7.6): in a card, scroll sideways, never the page */
+.table-wrap { overflow-x: auto; margin: 0 -20px -20px; }
+.table { width: 100%; min-width: 720px; border-collapse: collapse; font-size: 14px; line-height: 20px; }
+.table th { text-align: left; font-size: 12px; line-height: 16px; font-weight: 600; color: var(--tx2); padding: 12px 8px; border-bottom: 1px solid var(--ln); white-space: nowrap; }
+.table td { padding: 10px 8px; border-bottom: 1px solid var(--ln); vertical-align: top; }
+.table th:first-child, .table td:first-child { padding-left: 20px; }
+.table th:last-child, .table td:last-child { padding-right: 20px; }
+.table tr:last-child td { border-bottom: 0; }
+.table .num { text-align: right; white-space: nowrap; }
+.table .dim { color: var(--tx3); font-size: 13px; }
+.table .who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.table .who b { font-weight: 600; }
+.table .who span { font-size: 12px; line-height: 16px; color: var(--tx3); overflow-wrap: anywhere; }
+.table .badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.table .err { color: var(--crit); font-size: 12px; line-height: 16px; max-width: 420px; overflow-wrap: anywhere; }
+
+/* Status dot (§7.4) */
+.dot { width: 8px; height: 8px; border-radius: 4px; background: var(--good); display: inline-block; flex: none; }
+.dot--warn { background: var(--warn-fill); }
+.dot--crit { background: var(--crit-fill); }
+.dot--off { background: var(--ln2); }
+
+/* Search (§6.1): 40 h, sunk fill */
+.search { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; border-radius: var(--r-md); background: var(--sf2); border: 1px solid var(--ln); flex: 1 1 280px; max-width: 480px; }
+.search input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--tx); font: inherit; font-size: 14px; outline: none; }
+.search input::placeholder { color: var(--tx3); }
+.search:focus-within { border-color: var(--ac); }
+
+/* Forms on the backups page */
+.form-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.form-row .field { flex: 1 1 320px; }
+.input--sm { height: 44px; font-size: 14px; }
+.btn--sm .spin { width: 14px; height: 14px; }
+.spin { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--sunk); border-top-color: var(--ac); animation: spin .9s linear infinite; flex: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+
+/* Thin meter (§7.8), drawn as SVG so the fill width needs no inline style */
+.meter { width: 100%; height: 6px; display: block; }
+.meter__track { fill: var(--sunk); }
+.meter__fill { fill: var(--ac); }
+
+/* Definition list used in cards */
+.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 16px; font-size: 13px; line-height: 18px; }
+.kv dt { color: var(--tx3); }
+.kv dd { margin: 0; color: var(--tx); overflow-wrap: anywhere; }
+.code { font-family: var(--font-mono); font-size: 12px; background: var(--sunk); padding: 1px 6px; border-radius: var(--r-xs); overflow-wrap: anywhere; }
+
+.page-head { display: flex; flex-direction: column; gap: 4px; }
+.page-head .t-body-s { color: var(--tx2); }
+.muted { color: var(--tx3); }
+.right { margin-left: auto; }
+.center { text-align: center; }
+.loading { display: flex; align-items: center; gap: 12px; color: var(--tx2); font-size: 14px; padding: 8px 0; }

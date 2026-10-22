@@ -1,6 +1,6 @@
 {
   "name": "identity",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "First-party OpenID Connect identity server for SpendLog, Trippin and InFrame",
   "type": "module",
@@ -10,12 +10,14 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && npm run build:admin",
+    "build:admin": "npm --prefix admin ci --no-audit --no-fund && npm --prefix admin run build",
     "start": "node dist/index.js",
     "test": "node --import tsx --test --test-concurrency=1 \"test/**/*.test.ts\"",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "gen-keys": "node scripts/gen-keys.mjs",
-    "user": "node dist/cli.js"
+    "user": "node dist/cli.js",
+    "backup": "node dist/cli.js backup"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.2.2",

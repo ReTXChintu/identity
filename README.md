@@ -227,6 +227,16 @@ After a deploy, run `git pull && npm ci && npm run build && pm2 restart identity
 - **Cookie key rotation:** prepend a new key to `COOKIE_KEYS` and keep the old one for 30 days, so existing sessions stay valid.
 - **MongoDB:** each oidc-provider model has its own collection, prefixed `oidc_`. A TTL index on `expiresAt` cleans up expired artifacts, and the codes, reset tokens and Google states also have TTL indexes.
 
+### Admin page and suite backups
+
+`/admin` (sign in with a pass-port account whose email is in `ADMIN_EMAILS`) shows, per app, who is signed in right now (an unexpired refresh or access token from pass-port for that app), who was active in the last 30 days and every sign-in since the page went live; a searchable user list with the same per app; and the backups.
+
+Backups run inside this process (`src/backups/`): every half hour at :00 and :30 IST (kept 48 hours) and at 00:00 IST (kept 90 days), for the identity database and whichever of `BACKUP_SPENDLOG_MONGO_URL`, `BACKUP_TRIPPIN_MONGO_URL` and `BACKUP_INFRAME_PG_URL` are set, into `BACKUP_DIR` (`/opt/var/backups`) as `<app>/<rolling|daily>/<app>__<kind>__<IST time>.<ext>`. Mongo dumps are gzip'd canonical Extended JSON lines (`{meta}` first, then `{c, d}` per document); Postgres uses `pg_dump --format=custom` from the newest `/usr/lib/postgresql/*/bin/pg_dump` on the box (Neon runs a newer major than Ubuntu's default client, so install `postgresql-client-<major>` from PGDG). Every dump is read back before it counts; a lock document keeps two processes from taking the same slot.
+
+The destination on `/admin/backups` is either this server only or a Google Drive folder (connected with the server's Google OAuth client; authorized redirect URI `<issuer>/admin/backups/drive/callback`). **Test** round-trips a probe file; **Migrate** copies every local backup to the folder, skipping what is already there, without deleting anything locally. `npm run backup -- now` takes a one-off rolling backup from the shell.
+
+Restoring a Mongo dump: `gunzip -c file.jsonl.gz | node -e '...'` reading each `{c, d}` line with `EJSON.parse({relaxed:false})` into `insertMany` on collection `c`. Restoring InFrame: `pg_restore --no-owner --dbname=<url> file.dump`.
+
 ### Admin CLI
 
 Run it on the server, from the project directory, after `npm run build`. It reads the same `.env` as the server.

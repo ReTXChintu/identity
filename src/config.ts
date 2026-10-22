@@ -106,6 +106,24 @@ const schema = z.object({
   SMTP_USER: optionalString,
   SMTP_PASS: optionalString,
   MAIL_FROM: z.preprocess(emptyToUndefined, z.string().default("SpendLog, Trippin & InFrame <no-reply@localhost>")),
+
+  // Admin area and suite backups.
+  ADMIN_EMAILS: z.preprocess(
+    (value) =>
+      typeof value === "string"
+        ? value
+            .split(",")
+            .map((v) => v.trim().toLowerCase())
+            .filter(Boolean)
+        : (value ?? []),
+    z.array(z.string()),
+  ),
+  BACKUP_DIR: z.preprocess(emptyToUndefined, z.string().default("/opt/var/backups")),
+  BACKUP_SPENDLOG_MONGO_URL: optionalString,
+  BACKUP_TRIPPIN_MONGO_URL: optionalString,
+  BACKUP_INFRAME_PG_URL: optionalString,
+  BACKUP_SECRETS_KEY: optionalString,
+  BACKUP_ENABLED: flag(true),
 });
 
 export type AppName = "spendlog" | "trippin" | "inframe";
@@ -139,8 +157,26 @@ export interface AppConfig {
     pass?: string;
   } | null;
   mailFrom: string;
+  /** Lower-cased emails allowed into /admin. */
+  adminEmails: string[];
+  backups: BackupConfig;
   /** Problems worth printing at startup that don't stop the server. */
   warnings: string[];
+}
+
+/** One database the scheduler dumps. */
+export interface BackupSource {
+  app: "spendlog" | "trippin" | "inframe" | "identity";
+  kind: "mongo" | "postgres";
+  url: string;
+}
+
+export interface BackupConfig {
+  enabled: boolean;
+  dir: string;
+  sources: BackupSource[];
+  /** 32 bytes, used to encrypt the Google Drive refresh token at rest. */
+  secretsKey: Buffer;
 }
 
 export class ConfigError extends Error {}
@@ -250,6 +286,26 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     else warnings.push("SMTP_HOST is not set: verification codes and reset links are printed to the console.");
   }
 
+  if (e.ADMIN_EMAILS.length === 0) warnings.push("ADMIN_EMAILS is not set: nobody can open /admin.");
+
+  const sources: BackupSource[] = [{ app: "identity", kind: "mongo", url: e.MONGODB_URI }];
+  if (e.BACKUP_SPENDLOG_MONGO_URL) sources.push({ app: "spendlog", kind: "mongo", url: e.BACKUP_SPENDLOG_MONGO_URL });
+  else warnings.push("BACKUP_SPENDLOG_MONGO_URL is not set: SpendLog's database is not backed up.");
+  if (e.BACKUP_TRIPPIN_MONGO_URL) sources.push({ app: "trippin", kind: "mongo", url: e.BACKUP_TRIPPIN_MONGO_URL });
+  else warnings.push("BACKUP_TRIPPIN_MONGO_URL is not set: Trippin's database is not backed up.");
+  if (e.BACKUP_INFRAME_PG_URL) sources.push({ app: "inframe", kind: "postgres", url: e.BACKUP_INFRAME_PG_URL });
+  else warnings.push("BACKUP_INFRAME_PG_URL is not set: InFrame's database is not backed up.");
+
+  // The Drive refresh token is encrypted with its own key when one is given;
+  // otherwise with one derived from the cookie keys, so rotating COOKIE_KEYS
+  // (dropping the oldest) means reconnecting Drive once.
+  const secretsKey = e.BACKUP_SECRETS_KEY
+    ? crypto.createHash("sha256").update(e.BACKUP_SECRETS_KEY).digest()
+    : crypto.createHash("sha256").update(`backup-secrets:${cookieKeys[cookieKeys.length - 1]}`).digest();
+  if (!e.BACKUP_SECRETS_KEY && production) {
+    warnings.push("BACKUP_SECRETS_KEY is not set: the Google Drive token is encrypted with a key derived from COOKIE_KEYS.");
+  }
+
   return {
     env: e.NODE_ENV,
     port: e.PORT,
@@ -265,6 +321,8 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     google,
     smtp,
     mailFrom: e.MAIL_FROM,
+    adminEmails: e.ADMIN_EMAILS,
+    backups: { enabled: e.BACKUP_ENABLED, dir: e.BACKUP_DIR, sources, secretsKey },
     warnings,
   };
 }

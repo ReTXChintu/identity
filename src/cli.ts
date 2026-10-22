@@ -9,7 +9,9 @@
 import path from "node:path";
 import readline from "node:readline";
 import { fileURLToPath } from "node:url";
-import { environment } from "./config.js";
+import { manualSlot } from "./backups/policy.js";
+import { runPass, withBackupLock } from "./backups/runner.js";
+import { environment, loadConfig } from "./config.js";
 import { connectDatabase, disconnectDatabase } from "./db.js";
 import { normalizeEmail, User } from "./models/user.js";
 import { revokeAllForUser } from "./oidc/revoke.js";
@@ -21,7 +23,8 @@ const USAGE = `Usage:
   npm run user -- list
   npm run user -- show <email>
   npm run user -- verify <email>
-  npm run user -- set-password <email>   (prompts, or set NEW_PASSWORD)`;
+  npm run user -- set-password <email>   (prompts, or set NEW_PASSWORD)
+  npm run backup -- now                  (dump every configured database once, as a rolling backup)`;
 
 /** Reads a line without echoing it, when attached to a terminal. */
 function askHidden(question: string): Promise<string> {
@@ -100,6 +103,17 @@ async function run(command: string | undefined, arg: string | undefined) {
       await u.save();
       await revokeAllForUser(u.id);
       return console.log(`Password set for ${u.email}. Their sessions and refresh tokens were revoked.`);
+    }
+    case "backup": {
+      if (arg !== "now") throw new Error(USAGE);
+      const config = loadConfig(environment(projectRoot));
+      const result = await withBackupLock(() =>
+        runPass({ backups: config.backups, google: config.google, log: (line) => console.log(line) }, manualSlot(new Date()), "manual"),
+      );
+      if (!result) throw new Error("A backup is running already (the lock is held). Try again in a minute.");
+      console.log(`done: ${result.ok} ok, ${result.failed} failed, ${result.pruned} pruned, slot ${result.slot.id}`);
+      if (result.failed > 0) process.exitCode = 1;
+      return;
     }
     default:
       throw new Error(USAGE);

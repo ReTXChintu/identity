@@ -6,7 +6,7 @@ import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { MongoMemoryServer } from "mongodb-memory-server";
 import mongoose from "mongoose";
-import { createApp } from "../src/app.js";
+import { type AppDeps, createApp } from "../src/app.js";
 import { loadConfig } from "../src/config.js";
 import { connectDatabase } from "../src/db.js";
 import { User } from "../src/models/user.js";
@@ -64,7 +64,14 @@ export interface Harness {
 
 let mongod: MongoMemoryServer | null = null;
 
-export async function startHarness(): Promise<Harness> {
+export interface HarnessOptions {
+  /** Extra or overriding environment for loadConfig (e.g. ADMIN_EMAILS, BACKUP_DIR). */
+  env?: Record<string, string>;
+  /** Passed straight to createApp (fake Drive, fake dumper, clock). */
+  deps?: AppDeps;
+}
+
+export async function startHarness(options: HarnessOptions = {}): Promise<Harness> {
   if (!mongod) {
     mongod = await MongoMemoryServer.create();
     await connectDatabase(mongod.getUri("identity-test"));
@@ -93,11 +100,13 @@ export async function startHarness(): Promise<Harness> {
     TRIPPIN_WEB_REDIRECT_URI: "https://trippin.example/auth/callback",
     INFRAME_WEB_CLIENT_SECRET: "inframe-web-test-secret-0123456789abcdef",
     INFRAME_WEB_REDIRECT_URI: "https://inframe.example/auth/callback",
+    BACKUP_ENABLED: "false",
+    ...(options.env ?? {}),
   });
 
   const outbox = new Outbox();
   const google = new FakeGoogle();
-  const app = createApp(config, { mailer: outbox, google });
+  const app = createApp(config, { mailer: outbox, google, ...(options.deps ?? {}) });
   server.on("request", app.app);
 
   return {
@@ -111,6 +120,12 @@ export async function startHarness(): Promise<Harness> {
 
 async function connectIndexes() {
   await mongoose.connection.syncIndexes();
+}
+
+/** The in-memory MongoDB's URI for the test database (after startHarness). */
+export function mongoUri(): string {
+  if (!mongod) throw new Error("startHarness first");
+  return mongod.getUri("identity-test");
 }
 
 export async function stopMongo(): Promise<void> {

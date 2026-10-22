@@ -1,4 +1,5 @@
 import type Provider from "oidc-provider";
+import type { RunnerDeps } from "./backups/runner.js";
 import type { AppConfig } from "./config.js";
 import type { GoogleSignIn } from "./services/google.js";
 import type { Mailer } from "./services/mailer.js";
@@ -13,4 +14,6 @@ export interface AppContext {
   limits: Limits;
   /** HMAC key for CSRF tokens and stored code/token hashes. */
   secret: string;
+  /** What the backup scheduler, "Run now" and Migrate run with. */
+  backups: RunnerDeps;
 }
