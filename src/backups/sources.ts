@@ -145,5 +145,12 @@ export async function verifyPostgresDump(file: string): Promise<number> {
 
 export async function dumpSource(source: BackupSource, file: string): Promise<DumpResult> {
   await fs.promises.mkdir(path.dirname(file), { recursive: true, mode: 0o700 });
-  return source.kind === "mongo" ? dumpMongo(source.url, file) : dumpPostgres(source.url, file);
+  try {
+    return source.kind === "mongo" ? await dumpMongo(source.url, file) : await dumpPostgres(source.url, file);
+  } catch (err) {
+    // A failed dump leaves its half-written (often empty: pg_dump creates the file before
+    // it connects) .part behind; every failed slot would add another.
+    await fs.promises.rm(`${file}.part`, { force: true }).catch(() => undefined);
+    throw err;
+  }
 }

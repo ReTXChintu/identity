@@ -17,7 +17,7 @@ import { migrations, migrationStatus, startMigration } from "../src/backups/migr
 import { backupFileName, currentSlot, expiredNames, istLabel, kindOfSlot, manualSlot, parseBackupName, slotStart } from "../src/backups/policy.js";
 import { runPass, type RunnerDeps, sourcesLeftFor, withBackupLock } from "../src/backups/runner.js";
 import { startBackupScheduler } from "../src/backups/scheduler.js";
-import { dumpMongo, pgUrlForDump } from "../src/backups/sources.js";
+import { dumpMongo, dumpSource, pgUrlForDump } from "../src/backups/sources.js";
 import { BackupLock, BackupRun, BackupSettings } from "../src/models/admin.js";
 import { type Harness, mongoUri, startHarness, stopMongo } from "./helpers.js";
 
@@ -177,12 +177,14 @@ describe("backup runner", () => {
   });
 
   it("dumps every source into app/kind/<name>, records each run, and skips sources already done for the slot", async () => {
-    const slot = currentSlot(new Date("2026-10-22T10:05:00.000Z"));
+    // Today's slot, not a fixed date: the pass prunes by the real clock, so a slot more
+    // than 48 hours old has its fresh files deleted straight after they're written.
+    const slot = currentSlot(new Date());
     const result = await runPass(deps, slot, "schedule");
     assert.equal(result.ok, 3);
     assert.equal(result.failed, 0);
-    assert.ok(fs.existsSync(path.join(dir, "spendlog/rolling/spendlog__rolling__2026-10-22T15-30+0530.jsonl.gz")));
-    assert.ok(fs.existsSync(path.join(dir, "inframe/rolling/inframe__rolling__2026-10-22T15-30+0530.dump")));
+    assert.ok(fs.existsSync(path.join(dir, `spendlog/${slot.kind}/${backupFileName("spendlog", slot, "jsonl.gz")}`)));
+    assert.ok(fs.existsSync(path.join(dir, `inframe/${slot.kind}/${backupFileName("inframe", slot, "dump")}`)));
     const runs = await BackupRun.find({ slot: slot.id }).lean();
     assert.equal(runs.length, 3);
     assert.ok(runs.every((r) => r.ok && r.destination === "local" && r.items === 3));
@@ -247,6 +249,17 @@ describe("backup runner", () => {
     assert.equal(String(first.big), "9007199254740993");
     assert.equal(String(first.amount), "12.50");
     await db.collection("dump_probe").drop();
+  });
+
+  it("a failed dump leaves no .part file behind", async () => {
+    const file = path.join(dir, "inframe/rolling/broken.dump");
+    await fs.promises.mkdir(path.dirname(file), { recursive: true });
+    // What pg_dump leaves when it can't connect: an empty output file.
+    await fs.promises.writeFile(`${file}.part`, "");
+    const unreachable: BackupSource = { app: "inframe", kind: "postgres", url: "postgres://nobody:nothing@127.0.0.1:1/none" };
+    await assert.rejects(dumpSource(unreachable, file));
+    assert.ok(!fs.existsSync(`${file}.part`), "the partial file is removed");
+    assert.ok(!fs.existsSync(file), "and nothing pretends to be a finished dump");
   });
 
   it("the lock: one holder at a time, and an expired lock is taken over", async () => {
